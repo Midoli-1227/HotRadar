@@ -1,0 +1,2 @@
+"""HotRadar backend package."""
+

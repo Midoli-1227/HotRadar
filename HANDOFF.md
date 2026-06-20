@@ -1,0 +1,474 @@
+# HotRadar HANDOFF
+
+Last updated: 2026-06-10
+
+## Current Status
+
+- `SPEC.md` remains the highest product specification.
+- The project started with only `SPEC.md`; it is still not a Git repository.
+- Phase 0 through the first MVP implementation pass are complete as far as the current environment allows.
+- Backend core, SQLite storage, source status/debug records, keyword matching, API endpoints, scheduler loop, and fixture/offline data path are implemented.
+- React + TypeScript frontend is implemented, installed, built, started, and browser-verified.
+- Active MVP source count is now 14. 雪球 was removed from active first-version scope per user feedback because stable public collection required session/cookie handling. 百度热搜 was also removed from active first-version scope per user feedback.
+- Startup/source sync now disables legacy database sources that are no longer in `SOURCES`, so old `xueqiu` rows do not appear in Dashboard, Debug, or History.
+- AI / Big Tech official sources now use lightweight signal scoring from `config/signal-rules.json`; high/medium items are prioritized and low-signal official PR items are hidden from the Dashboard by default while remaining in SQLite history.
+- Homebrew `node` was installed because the previous `node` came from Codex.app and did not include `npm`.
+- `data/hotspots.sqlite` was created by the demo seed script for local verification. It is ignored by `.gitignore`.
+- Local domain gateway scripts now live in HotRadar and can serve HotRadar plus Japanese Notebook through `hotradar.test` and `jpnote.test`; `/etc/hosts` is now configured.
+- Local-domain `Failed to fetch` issue was fixed by changing the frontend default API base to relative paths and adding a Vite `/api` proxy for dev mode.
+- Recurring local-domain `502` issue was fixed by replacing the missing `/private/tmp/hotradar-venv` dependency with a project-local `.venv`.
+- Japanese Notebook was read for configuration discovery only in this pass; no files under `/Users/lanyangyang/Documents/Japanese_notebook_codex` were modified.
+- Later migration discussion: import/export migration was not needed because the user chose to keep the new domain going forward. A partial storage-module change in Japanese Notebook was reverted; `npm test` in `/Users/lanyangyang/Documents/Japanese_notebook_codex` passed.
+- One-time Japanese Notebook localStorage migration helper was added under HotRadar, not inside Japanese Notebook. It reads old-origin data from `http://127.0.0.1:5173/jpnote-migrate.html` and posts it to `http://jpnote.test:8088/__jpnote_receive`, which writes the same `japanese-vocab-notebook.words` key under the new origin.
+
+## Modified / Added Files
+
+- Planning and docs:
+  - `SPEC.md`
+  - `TASKS.md`
+  - `HANDOFF.md`
+  - `README.md`
+  - `.env.example`
+  - `.gitignore`
+- Config/data:
+  - `config/watch-keywords.json`
+  - `config/signal-rules.json`
+  - `data/.gitkeep`
+  - `data/hotspots.sqlite` (generated demo SQLite data, ignored)
+- Backend:
+  - `requirements.txt`
+  - `backend/app/__init__.py`
+  - `backend/app/main.py`
+  - `backend/app/service.py`
+  - `backend/app/settings.py`
+  - `backend/app/schemas.py`
+  - `backend/app/sources.py`
+  - `backend/app/keywords.py`
+  - `backend/app/url_utils.py`
+  - `backend/app/storage.py`
+  - `backend/app/signals.py`
+  - `backend/app/collectors/__init__.py`
+  - `backend/app/collectors/base.py`
+  - `backend/app/collectors/fixtures.py`
+  - `backend/app/collectors/http.py`
+  - `backend/tests/test_keywords.py`
+  - `backend/tests/test_storage.py`
+  - `backend/tests/test_signals.py`
+  - `backend/tests/test_collectors.py`
+  - `scripts/seed_demo_data.py`
+  - `scripts/local_domains.py`
+  - `scripts/start_local_domains.sh`
+  - `frontend/public/jpnote-migrate.html`
+- Frontend:
+  - `frontend/package.json`
+  - `frontend/package-lock.json`
+  - `frontend/index.html`
+  - `frontend/tsconfig.json`
+  - `frontend/tsconfig.node.json`
+  - `frontend/vite.config.ts`
+  - `frontend/src/vite-env.d.ts`
+  - `frontend/src/types.ts`
+  - `frontend/src/api.ts`
+  - `frontend/src/main.tsx`
+  - `frontend/src/App.tsx`
+  - `frontend/src/styles.css`
+
+## Commands Run
+
+- Initial discovery:
+  - `pwd`
+  - `ls`
+  - `rg --files`
+  - `sed -n '1,240p' SPEC.md`
+  - `sed -n '241,520p' SPEC.md`
+  - `sed -n '521,1040p' SPEC.md`
+  - `git status --short` (failed: not a git repository)
+  - `git rev-parse --show-toplevel` (failed: not a git repository)
+  - `find . -maxdepth 2 -type f`
+- Japanese Notebook local-domain discovery:
+  - `ls -la /Users/lanyangyang/Documents`
+  - `find /Users/lanyangyang/Documents/Japanese_notebook_codex -maxdepth 3 (...) -type f`
+  - `sed -n '1,260p' /Users/lanyangyang/Documents/Japanese_notebook_codex/package.json`
+  - `sed -n '1,320p' /Users/lanyangyang/Documents/Japanese_notebook_codex/README.md`
+  - `find /Users/lanyangyang/Documents/Japanese_notebook_codex -maxdepth 2 -type f | sort`
+- Runtime checks:
+  - `python3 --version` -> Python 3.14.4
+  - `node --version` -> v24.14.0
+  - `npm --version` -> not found
+  - `python3 -m pytest --version` -> pytest not installed
+  - `python3 -c "import fastapi; ..."` -> FastAPI not installed in base Python
+  - `python3 -c "import uvicorn; ..."` -> Uvicorn not installed in base Python
+  - `corepack --version` -> not found
+  - `which -a npm`, `which -a pnpm`, `which -a yarn` -> not found
+  - `ls /opt/homebrew/bin`
+  - `/opt/homebrew/bin/brew list node` -> node was not installed
+  - `/opt/homebrew/bin/brew info node` -> node formula available
+  - `/opt/homebrew/bin/brew install node` -> installed Homebrew Node 26.3.0 and npm 11.16.0
+  - `/opt/homebrew/bin/node --version` -> v26.3.0
+  - `/opt/homebrew/bin/npm --version` -> 11.16.0
+- Verification:
+  - `python3 -m compileall backend/app scripts` -> pass
+  - `python3 -m unittest discover backend/tests` -> first run found a test fixture expectation issue; after fix, pass; latest run passes `6` tests
+  - `python3 scripts/seed_demo_data.py` -> seeded demo data for 16 sources
+  - Dashboard data smoke via storage -> `4 16 50`
+  - History smoke via storage with `q='OpenAI'` -> `23` items
+  - Debug status smoke via storage -> `16` sources, first status `success`
+- Dependency and API smoke:
+  - `python3 -m venv /private/tmp/hotradar-venv`
+  - `/private/tmp/hotradar-venv/bin/python -m pip install -r requirements.txt` -> failed inside sandbox due DNS/network
+  - Same pip install with escalation -> success, installed FastAPI/Uvicorn into temporary venv
+  - Uvicorn bind without escalation -> failed with operation not permitted
+  - Uvicorn bind with escalation -> success on `http://127.0.0.1:8000`
+  - `curl` API smoke:
+    - `/api/dashboard` -> HTTP 200, parsed as `4` sections, `16` source panels, and keyword match metadata
+    - `/api/history?q=OpenAI` -> HTTP 200, parsed as `23` items
+    - `/api/debug/sources` -> HTTP 200, parsed as `16` sources, first status `success`
+    - `POST /api/refresh` -> HTTP 200, parsed status `started`
+  - Stopped Uvicorn process by PID with escalation.
+  - Post-stop curl health check -> HTTP `000`, confirming server stopped.
+- Frontend install/build/browser verification:
+  - `/opt/homebrew/bin/npm install` in `frontend` -> success, 70 packages installed, 0 vulnerabilities
+  - `/opt/homebrew/bin/npm run build` in `frontend` -> success, TypeScript and Vite production build passed
+  - Started backend fixture-mode server:
+    - `env HOTRADAR_COLLECTOR_MODE=fixture /private/tmp/hotradar-venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000`
+  - Started frontend dev server:
+    - `/opt/homebrew/bin/npm run dev -- --host 127.0.0.1`
+  - Browser verification on `http://127.0.0.1:5173/`:
+    - Dashboard title `HotRadar`
+    - Brand visible
+    - My Watch was visible in the earlier implementation
+    - 16 source cards
+    - 30 visible My Watch items in the earlier implementation
+    - 0 error banners
+    - Screenshot saved to `/private/tmp/hotradar-dashboard.png`
+  - Browser verification on `http://127.0.0.1:5173/history`:
+    - Keyword input visible
+    - Search button visible
+    - 128 history table rows rendered
+  - Browser verification on `http://127.0.0.1:5173/debug/sources`:
+    - 16 debug table rows rendered
+    - Status and Error Message columns visible
+    - Console error logs: none
+  - Final verification after updating handoff/tasks:
+    - `python3 -m unittest discover backend/tests` -> passed (`6` tests)
+    - `/opt/homebrew/bin/npm run build` -> passed
+    - `curl http://127.0.0.1:8000/` -> HTTP 200
+    - `curl http://127.0.0.1:5173/` -> HTTP 200
+- Product-feedback implementation:
+  - Removed homepage My Watch aggregate section per user feedback.
+  - Source panels now display favicon-style source icons.
+  - Source panels are capped at 5 visible items; no expand button.
+  - Summaries are clamped to reduce panel height.
+  - Added 华尔街见闻 live collector using public 7x24 API.
+  - Added 财联社 homepage collector using public article links from SSR HTML.
+  - Re-ran forced hybrid collection:
+    - 华尔街见闻 -> success, 6 items
+    - 财联社 -> success, 20 items
+    - 雪球 -> failed/degraded at that time due session/cookie requirements; later removed from active MVP scope.
+  - Browser verification after UI changes:
+    - My Watch visible: false
+    - Source cards: 16
+    - Source icons: 16
+    - Max visible items per panel: 5
+    - 华尔街见闻 data visible: true
+    - 财联社 data visible: true
+    - Error banners: 0
+    - Screenshot saved to `/private/tmp/hotradar-updated-dashboard.png`
+  - Final verification after this feedback pass:
+    - `curl http://127.0.0.1:8000/` -> HTTP 200
+    - `curl http://127.0.0.1:5173/` -> HTTP 200
+    - `python3 -m unittest discover backend/tests` -> passed (`6` tests)
+    - `/opt/homebrew/bin/npm run build` -> passed
+- Source availability fix after user noticed empty panels:
+  - Root causes found in Debug:
+    - Anthropic: old RSS URL returned HTTP 404.
+    - Intel: old `intel.com` newsroom RSS/page was blocked or returned HTTP 403/404.
+    - Product Hunt: previously left as degraded even though a public Atom feed exists.
+    - 知乎热榜: `www.zhihu.com` API/page returned 401/403, but `api.zhihu.com` hot-list endpoint works.
+    - 微博热搜: previously left as degraded even though `weibo.com/ajax/side/hotSearch` works.
+    - 百度热搜: previously left as degraded even though the public page includes an `s-data` payload.
+    - 雪球: tested endpoints returned WAF/session/login errors; later removed from active MVP scope.
+  - Implemented fixes:
+    - Anthropic public news page HTML extraction.
+    - Intel official Investor Relations RSS feed: `https://www.intc.com/news-events/press-releases/rss`.
+    - Product Hunt public Atom feed: `https://www.producthunt.com/feed`.
+    - 知乎热榜 public API: `https://api.zhihu.com/topstory/hot-lists/total?limit=20`.
+    - 微博热搜 public JSON: `https://weibo.com/ajax/side/hotSearch`.
+    - 百度热搜 public page `s-data` extraction.
+  - Forced hybrid/live collection after these fixes:
+    - Before removal, success: 15 of 16 sources.
+    - Newly fixed success counts: Anthropic 9, Intel 12, Product Hunt 20, 知乎热榜 20, 微博热搜 20, 百度热搜 20.
+    - The remaining failed/degraded source at that time was 雪球; it has since been removed from active MVP scope.
+  - Browser verification after these fixes:
+    - Anthropic, Intel, Product Hunt, 知乎热榜, 微博热搜, 百度热搜 all show 5 visible items.
+    - 雪球 was empty with Debug failure at that time; it has since been removed from active MVP scope.
+    - Error banners: 0.
+    - Screenshot saved to `/private/tmp/hotradar-seven-sources.png`.
+- Wallstreetcn rank/order fix:
+  - Root cause: dashboard source panels were built from each unique historical item's latest snapshot, so stale items from older fetch batches could mix into the current panel; Wallstreetcn also skipped untitled API rows while preserving the API's original sparse index.
+  - Backend now prefers the latest snapshot batch for each source instead of mixing historical items.
+  - Each collection run normalizes all items to one shared `fetchedAt`, making batch selection reliable.
+  - Wallstreetcn collector now assigns compact ranks to valid items.
+  - Frontend now displays the backend item `rank`; later source-order work removed visible-row re-numbering.
+  - Regression test added: stale low-rank items from older batches no longer appear in dashboard panels.
+  - Verification:
+    - `python3 -m unittest discover backend/tests` -> passed (`7` tests)
+    - `/opt/homebrew/bin/npm run build` -> passed
+    - Forced Wallstreetcn refresh -> success, 5 items
+    - Dashboard API Wallstreetcn ranks -> `1,2,3,4,5`
+    - Browser Wallstreetcn visible ranks -> `1,2,3,4,5`
+- Xueqiu removal and final active-source verification:
+  - Removed 雪球 from `SPEC.md`, `TASKS.md`, and active backend `SOURCES`.
+  - Added source sync behavior that disables old DB sources not present in active config.
+  - Dashboard status rows, Dashboard last-refresh calculation, Debug, and History now ignore disabled legacy sources.
+  - Added regression test for a legacy `xueqiu` DB row being hidden from Debug/History and marked disabled.
+  - Verification:
+    - `python3 -m compileall backend/app scripts` -> passed
+    - `python3 -m unittest discover backend/tests` -> passed (`8` tests)
+    - `/opt/homebrew/bin/npm run build` -> passed
+    - Forced live/hybrid refresh -> `15` active sources, `15` successes, `0` failures
+    - Dashboard API -> `4` sections, `15` source panels, no `xueqiu`
+    - Debug API -> `15` rows, all `success`, no `xueqiu`
+    - History API -> no `xueqiu` items in latest 500-item check
+    - Browser Dashboard -> `15` source cards, `15` icons, no My Watch, no 雪球, no empty-state panels, max visible items per card `5`
+    - Browser Debug -> `15` rows, no failed text, no 雪球
+    - Browser History -> `200` rendered rows, source filter has `15` active sources, no 雪球
+    - Browser console errors -> `0`
+    - Final post-update health check -> backend `200`, frontend `200`, Debug `15` rows all `success`, backend logs only 200 OK requests
+    - Screenshot saved to `/private/tmp/hotradar-dashboard-final.png`
+- Ranking source-order fix:
+  - User feedback: ranking sources such as Hacker News, GitHub Trending, and Product Hunt must follow the source site's/API/feed's original order; keyword matches must not reorder items.
+  - Confirmed keyword matching was only used for highlighting, but collectors/UI still needed stronger source-order guarantees.
+  - Hacker News collector now uses official Firebase `topstories` order instead of Algolia front-page search.
+  - GitHub Trending collector now parses only ranking `<article class="Box-row">` blocks and ignores navigation/sponsor/app links outside the ranked list.
+  - Product Hunt now has an explicit feed-order collector using the public Atom feed entry order; Product Hunt's live feed can change quickly between checks.
+  - Frontend source rows now display `item.rank` from the backend instead of re-numbering visible rows.
+  - Added regression tests:
+    - Hacker News preserves official topstories order.
+    - GitHub Trending ignores non-ranking links and preserves article order.
+    - Product Hunt preserves Atom entry order.
+    - Keyword matches do not reorder ranked source items.
+  - Verification:
+    - `python3 -m compileall backend/app scripts` -> passed
+    - `python3 -m unittest discover backend/tests` -> passed (`12` tests)
+    - `/opt/homebrew/bin/npm run build` -> passed
+    - Forced live/hybrid refresh -> `15` active sources, all `success`
+    - Same-batch collector-to-dashboard check -> Hacker News, GitHub Trending, and Product Hunt all matched collector order exactly
+    - Browser DOM vs Dashboard API check -> three source panels matched API order and ranks `1-5`
+    - Frontend console errors -> `0`
+    - Final health check -> backend `200`, frontend `200`, Debug `15` rows all `success`
+    - Note: one accidental `/opt/homebrew/bin/npm run build` from repo root failed with `ENOENT` because root has no `package.json`; rerun from `frontend/` passed.
+- AI official source signal-scoring pass:
+  - Added `config/signal-rules.json` with enabled sources limited to OpenAI, Anthropic, Google, Microsoft, NVIDIA, and Intel.
+  - Added `backend/app/signals.py` for deterministic high/low term scoring.
+  - Signal metadata is stored in each snapshot's existing `extra_json` payload as `signalScore`, `signalLevel`, and `signalReasons`; no database schema migration was needed.
+  - `CollectionService` applies signal scoring after normalization and before saving snapshots.
+  - Dashboard filtering applies only to configured AI / Big Tech official sources:
+    - high and medium are shown first.
+    - low is hidden by default.
+    - hidden low-signal count is included only on signal-enabled source panels.
+  - Ranking sources are explicitly not affected; source rank ordering remains intact.
+  - Frontend now shows signal badges on visible official items and low-hidden counts in source headers.
+  - Fixed `storage.get_connection()` to close SQLite connections on context exit, removing ResourceWarning noise in tests.
+  - Added tests:
+    - high terms raise score and level.
+    - low terms reduce score while high terms can offset.
+    - ranking sources are not scored.
+    - scoring writes to `HotItem.extra`.
+    - official AI dashboard panels hide low and prioritize high/medium.
+    - ranking panels ignore signal metadata for ordering.
+  - Verification:
+    - `python3 -m compileall backend/app scripts` -> passed
+    - `python3 -m unittest discover backend/tests` -> passed (`18` tests)
+    - `/opt/homebrew/bin/npm run build` from `frontend/` -> passed
+    - Local smoke with synthetic OpenAI/Hacker News data -> OpenAI hid `1` low item; Hacker News preserved rank order and had no hidden-count field
+    - Restarted backend with updated code on `http://127.0.0.1:8000` (PID `39429`)
+    - HTTP health -> backend `200`, frontend `200`
+    - Manual refresh via `POST /api/refresh` -> accepted and completed in background
+- Post-refresh Debug before Baidu removal -> `15` rows, all `success`
+    - Post-refresh AI hidden low counts -> OpenAI `8`, Anthropic `6`, Google `13`, Microsoft `6`, NVIDIA `14`, Intel `12`
+    - Ranking panels still have no `hiddenLowSignalCount`
+- Baidu Hot removal:
+  - Removed `baidu-hot` / 百度热搜 from active backend `SOURCES`.
+  - Updated `SPEC.md` and `TASKS.md` so Chinese Hot Topics now contains 知乎热榜、哔哩哔哩热门、微博热搜.
+  - Existing storage source sync disables the old DB source row on backend startup; historical rows remain in SQLite but are hidden from Dashboard, Debug, and History.
+  - Updated dashboard source-count test from `15` to `14`.
+  - Verification:
+    - `python3 -m compileall backend/app scripts` -> passed
+    - `python3 -m unittest discover backend/tests` -> passed (`18` tests)
+    - `/opt/homebrew/bin/npm run build` from `frontend/` -> passed
+    - Restarted backend with updated code on `http://127.0.0.1:8000` (PID `39786`)
+    - HTTP health -> backend `200`, frontend `200`
+    - Dashboard API -> `4` sections, `14` source panels, Chinese Hot Topics sources `知乎热榜`, `哔哩哔哩热门`, `微博热搜`
+    - Debug API -> `14` rows, all `success`, no `baidu-hot`
+    - History API latest 500-item check -> no `baidu-hot`
+- Dashboard source jump bar:
+  - Added a second sticky row below the HotRadar toolbar for source-level navigation.
+  - The jump bar is generated from `data.sections.flatMap(section => section.sources)` so it stays in sync with active dashboard sources automatically.
+  - Each source card now exposes a stable DOM anchor id `source-<source.id>`.
+  - Clicking a source chip uses `scrollIntoView({ behavior: "smooth", block: "start" })`.
+  - Added `scroll-margin-top` on source cards so the sticky header does not cover the destination card.
+  - Desktop and mobile both use horizontal overflow for the jump bar.
+  - Verification:
+    - `/opt/homebrew/bin/npm run build` from `frontend/` -> passed
+    - `curl -I http://127.0.0.1:5173/` -> HTTP `200`
+    - `curl -I http://127.0.0.1:8000/api/dashboard` -> HTTP `405` on `HEAD`, `Allow: GET` confirms route is live
+    - Attempted browser automation with `mcp__node_repl__.js` + `playwright` -> failed because `playwright` module was not available in the current runtime
+
+## Test / Verification Results
+
+- Backend compile check: passed.
+- Backend unit tests: passed (`18` tests).
+- Keyword matching: passed.
+- URL normalization and deduplication: passed.
+- Snapshot persistence: passed.
+- Source failure fallback: passed; a failed fetch keeps previous dashboard data and records Debug error details.
+- Collector fixture contract: passed for configured MVP sources; current active source count is `14`.
+- Demo SQLite seed: passed.
+- API smoke test with temporary FastAPI server: passed.
+- Frontend build/start: passed.
+- Browser visual verification: passed for Dashboard, History, Debug, and the updated icon/5-item/no-My-Watch/no-Xueqiu dashboard.
+- Current HTTP health checks: backend 200, frontend 200.
+- Latest active source count: `14`; current Debug API has `14` rows, all `success`.
+- Ranking order verification: Hacker News, GitHub Trending, and Product Hunt preserve same-batch source order; keyword matches do not change source-panel order.
+- Signal scoring verification: AI / Big Tech official sources prioritize high/medium and hide low signal on Dashboard; Ranking View is unaffected.
+- Source jump navigation verification: frontend production build passed; local frontend root returned HTTP `200`; backend dashboard route rejects `HEAD` with expected HTTP `405` and `Allow: GET`. Full browser-click verification was attempted, but no usable browser automation tool/package was exposed in the current compacted context (`playwright` module unavailable).
+- Local domain gateway verification: script files added under HotRadar; `/etc/hosts` includes `127.0.0.1 hotradar.test jpnote.test` on line 11.
+- Local domain gateway host-header smoke:
+  - `python3 scripts/local_domains.py --port 18088` initially failed inside sandbox with `PermissionError: [Errno 1] Operation not permitted`; rerun with escalation for local port bind only.
+  - `curl -H 'Host: hotradar.test' http://127.0.0.1:18088/` -> HTTP `200`, returned HotRadar HTML title.
+  - `curl -H 'Host: jpnote.test' http://127.0.0.1:18088/` -> HTTP `200`, returned Japanese Notebook HTML title.
+  - `curl -H 'Host: hotradar.test' http://127.0.0.1:18088/api/dashboard` -> HTTP `200`, returned Dashboard JSON.
+  - Temporary test gateway was stopped with Ctrl+C after verification.
+- `/etc/hosts` install attempt:
+  - Attempted to append `127.0.0.1 hotradar.test jpnote.test` using `sudo sh -c ...`.
+  - The command failed because `sudo` needs the user's Mac password and this terminal session cannot provide it interactively.
+  - Follow-up `grep -nE 'hotradar\.test|jpnote\.test' /etc/hosts` returned no matches, so the system hosts mapping is not installed yet.
+- `/etc/hosts` install completion:
+  - User ran the sudo hosts command manually.
+  - `grep -nE 'hotradar\.test|jpnote\.test' /etc/hosts` -> line `11:127.0.0.1 hotradar.test jpnote.test`.
+  - `curl http://hotradar.test:8088/` -> HTTP `200`, returned HotRadar HTML title.
+  - `curl http://jpnote.test:8088/` -> HTTP `200`, returned Japanese Notebook HTML title.
+  - `curl http://hotradar.test:8088/api/dashboard` -> HTTP `200`, returned Dashboard JSON.
+- Local-domain CORS fix:
+  - Symptom: browser at `http://hotradar.test:8088` displayed `Failed to fetch`.
+  - Root cause: built frontend still requested `http://127.0.0.1:8000/api/...`, so the browser treated it as cross-origin from `hotradar.test:8088`.
+  - `frontend/src/api.ts` now defaults `API_BASE` to an empty string, so dashboard/history/debug/refresh call relative `/api/...` paths.
+  - `frontend/vite.config.ts` now proxies `/api` to `http://127.0.0.1:8000` for normal Vite dev mode.
+  - Rebuilt frontend dist; the new HTML references `assets/index-Bo3wz3e8.js`.
+  - Verification:
+    - `/opt/homebrew/bin/npm run build` from `frontend/` -> passed
+    - `python3 -m unittest discover backend/tests` -> passed (`18` tests)
+    - `rg '127\.0\.0\.1:8000' frontend/dist` -> no matches in built output
+    - `curl http://hotradar.test:8088/` -> HTTP `200`
+    - `curl http://hotradar.test:8088/api/dashboard` -> HTTP `200`
+- One-time Japanese Notebook localStorage migration:
+  - User clarified they do not want a permanent import/export feature, only a one-time copy from the old localStorage origin to the new domain.
+  - A partial import/export change in `/Users/lanyangyang/Documents/Japanese_notebook_codex/src/data/storage.js` was reverted; `npm test` in the Japanese Notebook project passed afterward.
+  - Added `frontend/public/jpnote-migrate.html` in HotRadar so the existing Vite dev server on `http://127.0.0.1:5173` can serve a page from the old origin and read old localStorage.
+  - Added `POST /__jpnote_receive` handling in `scripts/local_domains.py` for the `jpnote.test:8088` origin. It writes the received payload to `localStorage["japanese-vocab-notebook.words"]`.
+  - Restarted the local domain gateway on `127.0.0.1:8088` with updated code.
+  - Verification:
+    - `curl http://127.0.0.1:5173/jpnote-migrate.html` -> HTTP `200`
+    - `curl http://jpnote.test:8088/__jpnote_receive` -> HTTP `405` for GET, confirming route exists and expects POST
+    - `curl http://jpnote.test:8088/` -> HTTP `200`
+    - `python3 -m compileall scripts/local_domains.py` -> passed
+  - Opened `http://127.0.0.1:5173/jpnote-migrate.html` in the user's default browser via `open`; the helper auto-submits old localStorage data to the new origin if present.
+  - Browser localStorage write cannot be verified through `curl`; user should visually confirm by opening `http://jpnote.test:8088`.
+- Stable backend Python environment:
+  - Symptom: browser showed `Request failed: 502` even after running `bash scripts/start_local_domains.sh`.
+  - Diagnosis:
+    - `curl http://hotradar.test:8088/` -> HTTP `200`
+    - `curl http://hotradar.test:8088/api/dashboard` -> HTTP `502`
+    - `curl http://127.0.0.1:8000/api/dashboard` -> HTTP `000`
+    - `lsof -nP -iTCP:8000 -sTCP:LISTEN` -> no listener
+    - `lsof -nP -iTCP:8088 -sTCP:LISTEN` -> local domain gateway running
+  - Root cause: `scripts/start_local_domains.sh` defaulted to `/private/tmp/hotradar-venv/bin/python`, but that temporary venv no longer existed; fallback system Python did not have FastAPI/Uvicorn installed, so the backend exited immediately.
+  - Fix:
+    - Created project-local `.venv` under `/Users/lanyangyang/Documents/HotRadar/.venv`.
+    - Installed backend dependencies with `.venv/bin/python -m pip install -r requirements.txt`.
+    - Updated `scripts/start_local_domains.sh` to default to `$ROOT/.venv/bin/python`.
+    - Startup script now exits with a clear setup message if `.venv/bin/python` is missing instead of silently falling back to system Python.
+    - Local domain gateway is also launched through the same project-local Python.
+  - Verification:
+    - `.venv/bin/python -c 'import fastapi, uvicorn; ...'` -> FastAPI `0.137.0`, Uvicorn `0.49.0`
+    - `bash -n scripts/start_local_domains.sh` -> passed
+    - `python3 -m compileall backend/app scripts` -> passed
+    - `.venv/bin/python -m unittest discover backend/tests` -> passed (`18` tests)
+    - `/opt/homebrew/bin/npm run build` from `frontend/` -> passed
+    - Started backend with `.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000`
+    - `curl http://127.0.0.1:8000/api/dashboard` -> HTTP `200`
+    - `curl http://hotradar.test:8088/` -> HTTP `200`
+    - `curl http://hotradar.test:8088/api/dashboard` -> HTTP `200`
+
+## Implementation Notes
+
+- Dashboard API still computes keyword match metadata, but the frontend no longer renders a My Watch aggregate section. Keyword highlighting remains in original source panels.
+- Frontend source panels render favicon-style source icons and show at most 5 items.
+- Dashboard now includes a horizontal source jump bar directly below the HotRadar toolbar; it lists all active sources and smooth-scrolls to the selected source card.
+- Ranking source panels are ordered by collector/source rank. Keyword matching is not an ordering input.
+- Frontend displays backend `item.rank` directly.
+- AI / Big Tech official source panels use `extra.signalLevel` and `extra.signalScore` to prioritize high/medium official updates and hide low-signal PR items by default.
+- Signal scoring is configured in `config/signal-rules.json` and stored in existing snapshot `extra_json`.
+- Removed sources are disabled during database initialization and hidden from Dashboard, Debug, and History without deleting historical rows.
+- `GET /api/dashboard` returns cached data immediately and schedules a page-open refresh in the background.
+- `POST /api/refresh` starts a manual background refresh and enforces cooldown.
+- Backend scheduler uses the configured 30-minute interval when the FastAPI app is running.
+- Source-level recent-fetch cache avoids repeated high-frequency requests.
+- Homepage payload includes source status labels but no technical error details.
+- Debug payload includes latest error type/status/message for local troubleshooting.
+- Historical persistence uses `hot_items` for unique records and `hot_item_snapshots` for repeated observations.
+- Keyword matches are stored on snapshots and highlighted by the frontend.
+- Local domain gateway:
+  - Default domain names: `hotradar.test` and `jpnote.test`.
+  - Default gateway port: `8088`, so the initial URLs are `http://hotradar.test:8088` and `http://jpnote.test:8088`.
+  - `scripts/local_domains.py` serves HotRadar's built frontend from `frontend/dist`, proxies HotRadar `/api/*` to `http://127.0.0.1:8000`, and serves Japanese Notebook static files from `/Users/lanyangyang/Documents/Japanese_notebook_codex`.
+  - HotRadar frontend should use relative `/api` requests so the gateway can proxy API calls without browser CORS failures.
+  - One-time migration helper intentionally lives in HotRadar, not Japanese Notebook, to avoid adding a permanent import/export feature to the notebook UI.
+  - `scripts/start_local_domains.sh` checks `/etc/hosts`, builds HotRadar frontend, starts HotRadar backend if needed, and launches the gateway.
+  - `/etc/hosts` is system-level; user completed the sudo hosts mapping manually after the initial automated attempt could not provide a password.
+  - Japanese Notebook source files were not modified; its README/package were only read to confirm it is a static `python3 -m http.server` app that previously also used port `5173`.
+
+## Collector Status
+
+- Implemented live-attempt collectors:
+  - OpenAI RSS
+  - Anthropic public news page HTML extraction
+  - Google RSS
+  - Microsoft RSS
+  - NVIDIA RSS
+  - Intel Investor Relations RSS
+  - Hacker News official Firebase topstories API
+  - GitHub Trending ranking article parser
+  - Product Hunt Atom feed order
+  - 华尔街见闻 public 7x24 API
+  - 财联社 homepage SSR HTML article links
+  - 知乎热榜 public API
+  - 哔哩哔哩热门 public API
+  - 微博热搜 public hotSearch JSON
+- Removed from active MVP scope:
+  - 雪球: removed per user feedback because stable public collection needs session/cookie handling.
+  - 百度热搜: removed per user feedback.
+- Fixture collector is available for active sources through `HOTRADAR_COLLECTOR_MODE=fixture` or `python3 scripts/seed_demo_data.py`.
+
+## Blockers / Risks
+
+- No active MVP source is currently blocked in the latest verification run.
+- Long-running local dev servers are currently running for user verification:
+  - Backend: `http://127.0.0.1:8000`
+  - Frontend: `http://127.0.0.1:5173`
+  - Backend is now running through project-local `.venv`.
+- The earlier generated fixture database was moved to `/private/tmp/hotradar-fixture-hotspots.sqlite`.
+- Some live collectors may fail later depending on network, RSS URL changes, anti-scrape behavior, or API changes. Failures are recorded in `fetch_runs`, `fetch_errors`, and `source_status` by design and should not break the rest of the homepage.
+- The project directory is not a Git repository, so there is no tracked diff/status. Avoid overwriting user files; only `SPEC.md` pre-existed before this work.
+- FastAPI/Uvicorn are not installed in base Python, but project-local `.venv` now contains the backend dependencies and is used by `scripts/start_local_domains.sh`.
+- The local domain gateway currently uses port `8088` to avoid privileged port `80`. A no-port URL such as `http://hotradar.test` would require an additional system-level proxy/port-80 setup.
+
+## Next Step
+
+1. Ask the user to check `http://jpnote.test:8088`; if old words appear, mark the one-time migration task complete and remove or archive `frontend/public/jpnote-migrate.html` if desired.
+2. Use `bash scripts/start_local_domains.sh` when the local domain gateway is not running; it now uses project-local `.venv`.
+3. Open `http://hotradar.test:8088` and `http://jpnote.test:8088` for the two local sites.
+4. Decide later whether to add a no-port setup for `http://hotradar.test` and `http://jpnote.test`; that requires port `80` or a system-level reverse proxy.
+5. Keep active-source health visible through `/debug/sources`; current Debug has `14` rows and all are `success`.
+6. If any upstream site changes later, record it in Debug/HANDOFF and continue other sources instead of blocking the project.

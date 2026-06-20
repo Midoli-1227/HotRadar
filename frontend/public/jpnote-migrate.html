@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Japanese Notebook Local Migration</title>
+    <style>
+      :root {
+        color: #202624;
+        background: #f6f8f6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+
+      main {
+        width: min(560px, calc(100vw - 32px));
+        border: 1px solid #d9e2dd;
+        border-radius: 8px;
+        padding: 24px;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(27, 42, 37, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+      }
+
+      p {
+        color: #65736e;
+        line-height: 1.6;
+      }
+
+      button,
+      a {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        padding: 0 14px;
+        border: 0;
+        color: #fff;
+        background: #24776b;
+        font: inherit;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .muted {
+        font-size: 13px;
+      }
+
+      .error {
+        color: #a4382c;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>日语笔记本一次性迁移</h1>
+      <p id="status">正在检查旧地址里的本地数据...</p>
+      <form id="migrationForm" action="http://jpnote.test:8088/__jpnote_receive" method="post">
+        <input type="hidden" name="payload" id="payload" />
+      </form>
+      <button id="migrateButton" type="button" hidden>迁移到 jpnote.test:8088</button>
+      <p class="muted">这个页面只读取当前旧地址的浏览器本地数据，不会修改日语笔记本项目文件。</p>
+    </main>
+    <script>
+      const storageKey = "japanese-vocab-notebook.words";
+      const status = document.querySelector("#status");
+      const button = document.querySelector("#migrateButton");
+      const payloadInput = document.querySelector("#payload");
+      const form = document.querySelector("#migrationForm");
+      const rawValue = localStorage.getItem(storageKey);
+
+      if (!rawValue) {
+        status.className = "error";
+        status.textContent = "当前地址没有找到旧单词数据。请确认你是从 http://127.0.0.1:5173/jpnote-migrate.html 打开的。";
+      } else {
+        let count = 0;
+        try {
+          const parsed = JSON.parse(rawValue);
+          count = Array.isArray(parsed) ? parsed.length : 0;
+        } catch {
+          count = 0;
+        }
+
+        payloadInput.value = rawValue;
+        status.textContent = `已找到旧地址里的 ${count} 个单词。正在写入新地址 jpnote.test:8088...`;
+        button.hidden = false;
+        window.setTimeout(() => form.submit(), 700);
+      }
+
+      button.addEventListener("click", () => {
+        form.submit();
+      });
+    </script>
+  </body>
+</html>

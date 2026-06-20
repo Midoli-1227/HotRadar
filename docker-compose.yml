@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      HOTRADAR_CONFIG_DIR: /app/config
+      HOTRADAR_DATA_DIR: /app/data
+      HOTRADAR_DATABASE_PATH: /app/data/hotspots.sqlite
+      HOTRADAR_COLLECTOR_MODE: ${HOTRADAR_COLLECTOR_MODE:-hybrid}
+      HOTRADAR_HTTP_TIMEOUT_SECONDS: ${HOTRADAR_HTTP_TIMEOUT_SECONDS:-8}
+      HOTRADAR_SCHEDULED_REFRESH_MINUTES: ${HOTRADAR_SCHEDULED_REFRESH_MINUTES:-30}
+      HOTRADAR_MANUAL_REFRESH_COOLDOWN_SECONDS: ${HOTRADAR_MANUAL_REFRESH_COOLDOWN_SECONDS:-60}
+      HOTRADAR_SOURCE_MIN_REFRESH_SECONDS: ${HOTRADAR_SOURCE_MIN_REFRESH_SECONDS:-300}
+      HOTRADAR_ENABLE_SCHEDULER: ${HOTRADAR_ENABLE_SCHEDULER:-1}
+      HOTRADAR_REQUIRE_ADMIN_TOKEN: ${HOTRADAR_REQUIRE_ADMIN_TOKEN:-0}
+      HOTRADAR_ADMIN_TOKEN: ${HOTRADAR_ADMIN_TOKEN:-}
+      HOTRADAR_LOG_FORMAT: ${HOTRADAR_LOG_FORMAT:-json}
+      HOTRADAR_LOG_LEVEL: ${HOTRADAR_LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    volumes:
+      - hotradar-data:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  hotradar-data:
