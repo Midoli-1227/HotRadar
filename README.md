@@ -1,5 +1,7 @@
 # HotRadar
 
+[![CI](https://github.com/Midoli-1227/HotRadar/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Midoli-1227/HotRadar/actions/workflows/ci.yml)
+
 HotRadar 是一个本地优先的个人热点聚合工作台。第一版以 `SPEC.md` 为最高规格，使用 FastAPI、React + TypeScript 和 SQLite。
 
 面向简历或面试说明时，应把它描述为本地优先的后端聚合 MVP：它已经具备持久化 snapshot、失败隔离 collector、Debug/状态 API、API 集成测试、Docker Compose、本地 migration 和 GitHub Actions 配置，但不应声称有生产用户、真实 AWS 部署或大规模流量。
