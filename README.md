@@ -105,6 +105,8 @@ SQLite 数据通过 `hotradar-data` Docker volume 持久化。需要离线演示
 HOTRADAR_COLLECTOR_MODE=fixture docker compose up --build
 ```
 
+Docker、本地环境变量和未来部署计划的详细说明见 `DEPLOYMENT.md`。
+
 ## Local Domain Entrypoints
 
 HotRadar can also serve two local projects through named local domains:
@@ -272,6 +274,22 @@ GitHub Actions 配置位于 `.github/workflows/ci.yml`，会运行：
 - Frontend TypeScript/Vite build。
 
 该 workflow 需要项目推送到 GitHub 后才会实际运行。
+
+## Benchmark
+
+本地 synthetic benchmark 见：
+
+```text
+BENCHMARK.md
+```
+
+运行：
+
+```bash
+python3 scripts/benchmark_api.py --sizes 1000 10000 --repeats 5
+```
+
+benchmark 默认使用临时 SQLite 和生成的 fixture 数据，不会修改生产数据，也不代表真实生产流量。
 
 ## Database Migrations
 
